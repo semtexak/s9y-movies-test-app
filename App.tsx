@@ -4,10 +4,11 @@ import {
   Button,
   FlatList,
   ActivityIndicator,
-  StyleSheet,
   View,
   RefreshControl,
   Text,
+  Alert,
+  StyleSheet, StatusBar
 } from "react-native";
 import axios from "axios";
 import { IMovie } from "./components/movie/movie.model";
@@ -25,7 +26,7 @@ interface MovieFilter {
 enum FilterBy {
   Episode = "episode_number",
   Title = "title",
-  Description = "description"
+  Description = "description",
 }
 enum FilterOrder {
   Asc,
@@ -44,13 +45,20 @@ export default function App() {
    */
   const fetchMoviesFromApi = async () => {
     setState({ ...state, isLoading: true });
-    await new Promise((resolve) => setTimeout(resolve, 3000));
-    const { data } = await axios.get<{ movies: IMovie[] }>(
-      "https://raw.githubusercontent.com/RyanHemrick/star_wars_movie_app/master/movies.json"
-    );
 
-    // Setting response to state
-    setState({ movies: data.movies, filter: null, isLoading: false });
+    // Just for testing purposes, simulates server delay
+    // await new Promise((resolve) => setTimeout(resolve, 3000));
+    try {
+      const { data } = await axios.get<{ movies: IMovie[] }>(
+        "https://raw.githubusercontent.com/RyanHemrick/star_wars_movie_app/master/movies.json"
+      );
+
+      // Setting response to state
+      setState({ movies: data.movies, filter: null, isLoading: false });
+    } catch (e: any) {
+      setState({ movies: [], filter: null, isLoading: false });
+      Alert.alert('Sorry, something went wrong. :(');
+    }
   };
 
   /**
@@ -68,6 +76,7 @@ export default function App() {
         case FilterBy.Title:
           return first.localeCompare(second);
       }
+      return 0;
     });
 
     // Setting sorted movies to state with toggled order direction
@@ -90,7 +99,7 @@ export default function App() {
   return (
     <View style={styles.container}>
       <Text style={styles.pageTitle}>Movies</Text>
-      <SafeAreaView>
+      <SafeAreaView style={styles.flatList}>
         <FlatList
           data={state.movies}
           renderItem={renderMovie}
@@ -125,11 +134,14 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 10
   },
+  flatList: {
+    flex: 1
+  },
   pageTitle: {
     fontSize: 20,
     fontWeight: "bold",
     marginHorizontal: 2,
-    marginVertical: 8
+    marginVertical: 8,
   },
   loadingIndicator: {
     position: "absolute",
