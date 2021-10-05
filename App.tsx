@@ -1,12 +1,121 @@
-import { StatusBar } from 'expo-status-bar';
-import React from 'react';
-import { StyleSheet, Text, View } from 'react-native';
+import React, { useState, useEffect } from "react";
+import {
+  SafeAreaView,
+  Button,
+  FlatList,
+  ActivityIndicator,
+  StyleSheet,
+  View,
+  RefreshControl,
+  Text,
+} from "react-native";
+import axios from "axios";
+import { IMovie } from "./components/movie/movie.model";
+import Movie from "./components/movie/movie";
+
+interface AppState {
+  movies: IMovie[];
+  isLoading: boolean;
+  filter?: MovieFilter | null;
+}
+interface MovieFilter {
+  orderBy: FilterBy;
+  order: FilterOrder;
+}
+enum FilterBy {
+  Episode = "episode_number",
+  Title = "title",
+  Description = "description"
+}
+enum FilterOrder {
+  Asc,
+  Desc,
+}
 
 export default function App() {
+  const [state, setState] = useState<AppState>({
+    movies: [],
+    filter: null,
+    isLoading: false,
+  });
+
+  /**
+   * Fetches data from API, returns object with movies property
+   */
+  const fetchMoviesFromApi = async () => {
+    setState({ ...state, isLoading: true });
+    await new Promise((resolve) => setTimeout(resolve, 3000));
+    const { data } = await axios.get<{ movies: IMovie[] }>(
+      "https://raw.githubusercontent.com/RyanHemrick/star_wars_movie_app/master/movies.json"
+    );
+
+    // Setting response to state
+    setState({ movies: data.movies, filter: null, isLoading: false });
+  };
+
+  /**
+   * Sort by parameter, support toggle Asc & Desc
+   * @param filter filter by enum value - predefined values
+   */
+  const sortBy = (filter: FilterBy) => {
+    const sortDescending = state.filter?.order === FilterOrder.Asc;
+    const movies = state.movies.sort((a: IMovie, b: IMovie) => {
+      const first = (sortDescending ? a : b)[filter];
+      const second = (sortDescending ? b : a)[filter];
+      switch (filter) {
+        case FilterBy.Episode:
+          return +first - +second;
+        case FilterBy.Title:
+          return first.localeCompare(second);
+      }
+    });
+
+    // Setting sorted movies to state with toggled order direction
+    setState({
+      ...state,
+      movies: movies,
+      filter: {
+        orderBy: filter,
+        order: sortDescending ? FilterOrder.Desc : FilterOrder.Asc,
+      },
+    });
+  };
+
+  // Hook for (like componentDidMount) initial data load
+  useEffect(() => {
+    fetchMoviesFromApi();
+  }, []);
+
+  const renderMovie = ({ item }: { item: IMovie }) => <Movie {...item} />;
   return (
     <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
+      <Text style={styles.pageTitle}>Movies</Text>
+      <SafeAreaView>
+        <FlatList
+          data={state.movies}
+          renderItem={renderMovie}
+          // Episode number should be sufficient as a key instead of ID which is not present in response
+          keyExtractor={(item: IMovie) => item.episode_number}
+          refreshControl={
+            <RefreshControl
+              refreshing={state.isLoading}
+              onRefresh={fetchMoviesFromApi}
+            />
+          }
+        />
+      </SafeAreaView>
+
+      <View style={styles.loadingIndicator}>
+        {state.isLoading ? <ActivityIndicator /> : null}
+      </View>
+
+      <View style={styles.sortButton}>
+        <Button
+          onPress={() => sortBy(FilterBy.Title)}
+          color="#000000"
+          title="Sort"
+        />
+      </View>
     </View>
   );
 }
@@ -14,8 +123,22 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingHorizontal: 10
+  },
+  pageTitle: {
+    fontSize: 20,
+    fontWeight: "bold",
+    marginHorizontal: 2,
+    marginVertical: 8
+  },
+  loadingIndicator: {
+    position: "absolute",
+    top: "50%",
+    left: "50%",
+  },
+  sortButton: {
+    position: "absolute",
+    bottom: 5,
+    right: 10,
   },
 });
